@@ -12,12 +12,14 @@ module pwm_single (
 );
 
     logic [11:0] pwm_count;
+    logic        pwm_boundary_unused;
 
     pwm_counter u_pwm_counter (
         .clk       (clk),
         .rst_n     (rst_n),
         .pwm_div   (pwm_div),
-        .pwm_count (pwm_count)
+        .pwm_count (pwm_count),
+        .pwm_boundary (pwm_boundary_unused)
     );
 
     pwm_channel u_pwm_channel (

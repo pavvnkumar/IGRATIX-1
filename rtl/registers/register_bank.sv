@@ -199,6 +199,8 @@ module register_bank (
             // All request outputs are one-clock pulses.
             // ----------------------------------------------------
 
+            global_update        <= 1'b0;
+            group_update         <= 4'b0000;
             software_reset_pulse <= 1'b0;
 
 
@@ -256,9 +258,9 @@ module register_bank (
 
                         if (write_data[0])
                             global_update <= 1'b1;
-                    
+
                         group_update <= write_data[4:1];
-                    
+
                     end
 
 

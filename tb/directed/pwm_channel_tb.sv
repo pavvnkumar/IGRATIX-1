@@ -19,7 +19,7 @@ module pwm_channel_tb;
     );
 
     initial clk = 1'b0;
-    always #5 clk = ~clk;
+    always #5 clk <= ~clk;
 
     task automatic check_pwm(
         input logic [11:0] count,

@@ -9,6 +9,7 @@ module update_sync_tb;
 
     logic [11:0] shadow_duty [0:15];
     logic [11:0] active_duty [0:15];
+    logic update_done;
 
     logic        global_update;
     logic [3:0]  group_update;
@@ -25,7 +26,8 @@ module update_sync_tb;
         .global_update(global_update),
         .group_update (group_update),
 
-        .active_duty  (active_duty)
+        .active_duty  (active_duty),
+        .update_done(update_done)
     );
 
     initial clk = 1'b0;

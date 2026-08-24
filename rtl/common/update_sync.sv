@@ -23,6 +23,12 @@ module update_sync (
     logic pending_global;
     logic [3:0] pending_group;
 
+    logic [3:0] current_group;
+    logic       current_global;
+
+    assign current_group  = pending_group | group_update;
+    assign current_global = pending_global | global_update;
+
 
     always_ff @(posedge clk or negedge rst_n) begin
 
@@ -59,7 +65,7 @@ module update_sync (
             if(pwm_boundary) begin
 
 
-                if(pending_global) begin
+                if(current_global) begin
 
                     for(i=0;i<16;i=i+1)
                         active_duty[i] <= shadow_duty[i];
@@ -70,22 +76,22 @@ module update_sync (
                 else begin
 
 
-                    if(pending_group[0])
+                    if(current_group[0])
                         for(i=0;i<4;i=i+1)
                             active_duty[i] <= shadow_duty[i];
 
 
-                    if(pending_group[1])
+                    if(current_group[1])
                         for(i=4;i<8;i=i+1)
                             active_duty[i] <= shadow_duty[i];
 
 
-                    if(pending_group[2])
+                    if(current_group[2])
                         for(i=8;i<12;i=i+1)
                             active_duty[i] <= shadow_duty[i];
 
 
-                    if(pending_group[3])
+                    if(current_group[3])
                         for(i=12;i<16;i=i+1)
                             active_duty[i] <= shadow_duty[i];
 
