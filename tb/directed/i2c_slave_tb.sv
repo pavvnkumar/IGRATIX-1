@@ -688,3 +688,4 @@ module i2c_slave_tb;
     end
 
 endmodule
+

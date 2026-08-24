@@ -4,74 +4,105 @@ module update_sync (
     input  logic        clk,
     input  logic        rst_n,
 
-    // PWM period boundary.
-    // One-cycle pulse indicating that the PWM counter has
-    // reached the safe update point.
     input  logic        pwm_boundary,
 
-    // Shadow duty values from register_bank.
     input  logic [11:0] shadow_duty [0:15],
 
-    // Update requests from register_bank.
     input  logic        global_update,
     input  logic [3:0]  group_update,
 
-    // Active duty values consumed by pwm_controller.
-    output logic [11:0] active_duty [0:15]
+    output logic [11:0] active_duty [0:15],
+
+    output logic update_done
 );
 
+
     integer i;
+
+
+    logic pending_global;
+    logic [3:0] pending_group;
+
 
     always_ff @(posedge clk or negedge rst_n) begin
 
         if (!rst_n) begin
 
-            for (i = 0; i < 16; i = i + 1)
+            pending_global <= 1'b0;
+            pending_group  <= 4'b0000;
+
+            update_done <= 1'b0;
+
+            for(i=0;i<16;i=i+1)
                 active_duty[i] <= 12'h000;
 
         end
 
-        else if (pwm_boundary) begin
 
-            // ----------------------------------------------------
-            // Global update has priority.
-            // ----------------------------------------------------
+        else begin
 
-            if (global_update) begin
 
-                for (i = 0; i < 16; i = i + 1)
-                    active_duty[i] <= shadow_duty[i];
+            update_done <= 1'b0;
+
+
+            // Capture software request
+            if(global_update)
+                pending_global <= 1'b1;
+
+
+            if(|group_update)
+                pending_group <= pending_group | group_update;
+
+
+
+            // Apply only at PWM boundary
+            if(pwm_boundary) begin
+
+
+                if(pending_global) begin
+
+                    for(i=0;i<16;i=i+1)
+                        active_duty[i] <= shadow_duty[i];
+
+                end
+
+
+                else begin
+
+
+                    if(pending_group[0])
+                        for(i=0;i<4;i=i+1)
+                            active_duty[i] <= shadow_duty[i];
+
+
+                    if(pending_group[1])
+                        for(i=4;i<8;i=i+1)
+                            active_duty[i] <= shadow_duty[i];
+
+
+                    if(pending_group[2])
+                        for(i=8;i<12;i=i+1)
+                            active_duty[i] <= shadow_duty[i];
+
+
+                    if(pending_group[3])
+                        for(i=12;i<16;i=i+1)
+                            active_duty[i] <= shadow_duty[i];
+
+                end
+
+
+                pending_global <= 1'b0;
+                pending_group  <= 4'b0000;
+
+                update_done <= 1'b1;
+
 
             end
 
-            // ----------------------------------------------------
-            // Otherwise update selected groups.
-            // ----------------------------------------------------
-
-            else begin
-
-                if (group_update[0]) begin
-                    for (i = 0; i < 4; i = i + 1)
-                        active_duty[i] <= shadow_duty[i];
-                end
-
-                if (group_update[1]) begin
-                    for (i = 4; i < 8; i = i + 1)
-                        active_duty[i] <= shadow_duty[i];
-                end
-
-                if (group_update[2]) begin
-                    for (i = 8; i < 12; i = i + 1)
-                        active_duty[i] <= shadow_duty[i];
-                end
-
-                if (group_update[3]) begin
-                    for (i = 12; i < 16; i = i + 1)
-                        active_duty[i] <= shadow_duty[i];
-                end
-
-            end
         end
+
     end
+
 
 endmodule

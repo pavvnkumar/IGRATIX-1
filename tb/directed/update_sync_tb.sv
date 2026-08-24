@@ -235,3 +235,4 @@ module update_sync_tb;
     end
 
 endmodule
+

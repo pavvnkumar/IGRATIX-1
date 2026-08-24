@@ -26,3 +26,4 @@ module pwm_channel (
     end
 
 endmodule
+

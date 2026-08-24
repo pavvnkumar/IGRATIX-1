@@ -30,3 +30,4 @@ module pwm_single (
     );
 
 endmodule
+

@@ -109,3 +109,4 @@ module pwm_single_tb;
     end
 
 endmodule
+

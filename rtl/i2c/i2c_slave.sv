@@ -602,3 +602,4 @@ module i2c_slave #(
     end
 
 endmodule
+
