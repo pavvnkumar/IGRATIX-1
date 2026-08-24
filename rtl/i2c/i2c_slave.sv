@@ -21,7 +21,7 @@ module i2c_slave #(
 );
 
     // ============================================================
-    // Synchronize external I2C signals
+    // Synchronizers
     // ============================================================
 
     logic scl_meta;
@@ -31,6 +31,16 @@ module i2c_slave #(
     logic sda_meta;
     logic sda_sync;
     logic sda_prev;
+
+    wire scl_rise = scl_sync && !scl_prev;
+    wire scl_fall = !scl_sync && scl_prev;
+
+    wire start_detect =
+        scl_sync && sda_prev && !sda_sync;
+
+    wire stop_detect =
+        scl_sync && !sda_prev && sda_sync;
+
 
     always_ff @(posedge clk or negedge rst_n) begin
         if (!rst_n) begin
@@ -53,15 +63,6 @@ module i2c_slave #(
         end
     end
 
-    wire scl_rise = scl_sync && !scl_prev;
-    wire scl_fall = !scl_sync && scl_prev;
-
-    wire start_detect =
-        scl_sync && sda_prev && !sda_sync;
-
-    wire stop_detect =
-        scl_sync && !sda_prev && sda_sync;
-
 
     // ============================================================
     // State machine
@@ -79,6 +80,11 @@ module i2c_slave #(
 
     state_t state;
 
+
+    // ============================================================
+    // Data registers
+    // ============================================================
+
     logic [7:0] rx_shift;
     logic [7:0] tx_shift;
 
@@ -89,15 +95,20 @@ module i2c_slave #(
 
     logic [7:0] current_reg_addr;
 
-    // Tracks the two falling edges surrounding the address ACK.
+
+    // ============================================================
+    // ACK phase tracking
     //
-    // First falling edge:
-    //     end of address byte
+    // After receiving byte 8:
     //
-    // Second falling edge:
-    //     end of ACK clock
+    //   SCL FALL -> enter ACK
+    //   SCL HIGH -> master samples ACK
+    //   SCL FALL -> ACK complete
     //
-    logic       ack_phase;
+    // ============================================================
+
+    logic ack_low_seen;
+    logic ack_high_seen;
 
 
     // ============================================================
@@ -112,6 +123,7 @@ module i2c_slave #(
 
             rx_shift         <= 8'h00;
             tx_shift         <= 8'h00;
+
             bit_count        <= 3'd0;
 
             address_match    <= 1'b0;
@@ -119,7 +131,8 @@ module i2c_slave #(
 
             current_reg_addr <= 8'h00;
 
-            ack_phase        <= 1'b0;
+            ack_low_seen     <= 1'b0;
+            ack_high_seen    <= 1'b0;
 
             sda_drive_low    <= 1'b0;
 
@@ -133,7 +146,11 @@ module i2c_slave #(
 
         else begin
 
-            // Transaction pulses are one system-clock wide.
+            // ----------------------------------------------------
+            // Default transaction outputs.
+            // Both are one clk-wide event pulses.
+            // ----------------------------------------------------
+
             write_en <= 1'b0;
             read_req <= 1'b0;
 
@@ -148,6 +165,7 @@ module i2c_slave #(
 
                 rx_shift         <= 8'h00;
                 tx_shift         <= 8'h00;
+
                 bit_count        <= 3'd0;
 
                 address_match    <= 1'b0;
@@ -155,7 +173,8 @@ module i2c_slave #(
 
                 current_reg_addr <= 8'h00;
 
-                ack_phase        <= 1'b0;
+                ack_low_seen     <= 1'b0;
+                ack_high_seen    <= 1'b0;
 
                 sda_drive_low    <= 1'b0;
             end
@@ -167,18 +186,20 @@ module i2c_slave #(
 
             else if (stop_detect) begin
 
-                state         <= ST_IDLE;
+                state            <= ST_IDLE;
 
-                bit_count     <= 3'd0;
-                rx_shift      <= 8'h00;
-                tx_shift      <= 8'h00;
+                rx_shift         <= 8'h00;
+                tx_shift         <= 8'h00;
 
-                address_match <= 1'b0;
-                rw_bit        <= 1'b0;
+                bit_count        <= 3'd0;
 
-                ack_phase     <= 1'b0;
+                address_match    <= 1'b0;
+                rw_bit           <= 1'b0;
 
-                sda_drive_low <= 1'b0;
+                ack_low_seen     <= 1'b0;
+                ack_high_seen    <= 1'b0;
+
+                sda_drive_low    <= 1'b0;
             end
 
 
@@ -194,14 +215,17 @@ module i2c_slave #(
 
                         sda_drive_low <= 1'b0;
                         bit_count     <= 3'd0;
+
                     end
 
 
                     // =================================================
                     // ADDRESS RECEIVE
                     //
-                    // byte[7:1] = slave address
-                    // byte[0]   = R/W
+                    // Byte:
+                    //
+                    // [7:1] = slave address
+                    // [0]   = R/W
                     // =================================================
 
                     ST_ADDRESS: begin
@@ -221,26 +245,30 @@ module i2c_slave #(
                                     {rx_shift[6:0], sda_sync}[7:1]
                                     == DEVICE_ADDR
                                 ) begin
+
                                     address_match <= 1'b1;
                                     rw_bit <=
                                         {rx_shift[6:0], sda_sync}[0];
+
                                 end
                                 else begin
+
                                     address_match <= 1'b0;
                                     rw_bit <= 1'b0;
+
                                 end
 
-                                bit_count <= 3'd0;
-
-                                // Enter ACK phase.
-                                // ACK must survive the falling edge
-                                // terminating the address byte.
-                                ack_phase <= 1'b0;
+                                bit_count     <= 3'd0;
+                                ack_low_seen  <= 1'b0;
+                                ack_high_seen <= 1'b0;
 
                                 state <= ST_ADDRESS_ACK;
+
                             end
                             else begin
+
                                 bit_count <= bit_count + 3'd1;
+
                             end
                         end
                     end
@@ -248,71 +276,88 @@ module i2c_slave #(
 
                     // =================================================
                     // ADDRESS ACK
-                    //
-                    // Valid address:
-                    //     SDA LOW during ninth clock.
-                    //
-                    // Invalid address:
-                    //     SDA released.
                     // =================================================
 
                     ST_ADDRESS_ACK: begin
 
+                        // Valid address -> ACK.
+                        // Invalid address -> NACK.
                         if (address_match)
                             sda_drive_low <= 1'b1;
                         else
                             sda_drive_low <= 1'b0;
 
-                        if (scl_fall) begin
 
-                            if (!ack_phase) begin
+                        // First falling edge enters ACK phase.
+                        if (scl_fall && !ack_low_seen) begin
 
-                                // This falling edge belongs to the
-                                // eighth address bit.
-                                //
-                                // Keep SDA asserted for the actual
-                                // ninth ACK clock.
-                                ack_phase <= 1'b1;
+                            ack_low_seen  <= 1'b1;
+                            ack_high_seen <= 1'b0;
 
-                            end
-                            else begin
+                        end
 
-                                // This falling edge terminates the
-                                // actual ACK clock.
-                                sda_drive_low <= 1'b0;
-                                ack_phase     <= 1'b0;
 
-                                bit_count <= 3'd0;
-                                rx_shift  <= 8'h00;
+                        // SCL rising edge is the ACK sampling point.
+                        if (scl_rise && ack_low_seen) begin
 
-                                if (address_match) begin
+                            ack_high_seen <= 1'b1;
 
-                                    if (rw_bit) begin
+                        end
 
-                                        state <= ST_READ;
 
-                                        read_addr <= current_reg_addr;
-                                        read_req  <= 1'b1;
+                        // Final falling edge completes ACK.
+                        if (
+                            scl_fall &&
+                            ack_low_seen &&
+                            ack_high_seen
+                        ) begin
 
-                                        tx_shift <= read_data;
-                                    end
-                                    else begin
+                            sda_drive_low <= 1'b0;
 
-                                        state <= ST_WRITE;
-                                    end
+                            ack_low_seen  <= 1'b0;
+                            ack_high_seen <= 1'b0;
+
+                            bit_count <= 3'd0;
+                            rx_shift  <= 8'h00;
+
+
+                            if (address_match) begin
+
+                                if (rw_bit) begin
+
+                                    // -----------------------------
+                                    // Valid READ address.
+                                    // Generate read request exactly
+                                    // when address ACK completes.
+                                    // -----------------------------
+
+                                    read_addr <= current_reg_addr;
+                                    read_req  <= 1'b1;
+
+                                    tx_shift <= read_data;
+
+                                    state <= ST_READ;
 
                                 end
                                 else begin
 
-                                    state <= ST_IDLE;
+                                    // Valid WRITE address.
+                                    state <= ST_WRITE;
+
                                 end
+
+                            end
+                            else begin
+
+                                state <= ST_IDLE;
+
                             end
                         end
                     end
 
 
                     // =================================================
-                    // WRITE DATA
+                    // WRITE RECEIVE
                     // =================================================
 
                     ST_WRITE: begin
@@ -328,13 +373,18 @@ module i2c_slave #(
 
                             if (bit_count == 3'd7) begin
 
-                                bit_count <= 3'd0;
+                                bit_count     <= 3'd0;
+
+                                ack_low_seen  <= 1'b0;
+                                ack_high_seen <= 1'b0;
+
                                 state <= ST_WRITE_ACK;
 
                             end
                             else begin
 
                                 bit_count <= bit_count + 3'd1;
+
                             end
                         end
                     end
@@ -346,21 +396,49 @@ module i2c_slave #(
 
                     ST_WRITE_ACK: begin
 
+                        // Always ACK received write bytes.
                         sda_drive_low <= 1'b1;
 
-                        if (scl_fall) begin
+
+                        // First falling edge enters ACK phase.
+                        if (scl_fall && !ack_low_seen) begin
+
+                            ack_low_seen  <= 1'b1;
+                            ack_high_seen <= 1'b0;
+
+                        end
+
+
+                        // Master samples ACK.
+                        if (scl_rise && ack_low_seen) begin
+
+                            ack_high_seen <= 1'b1;
+
+                        end
+
+
+                        // ACK complete.
+                        if (
+                            scl_fall &&
+                            ack_low_seen &&
+                            ack_high_seen
+                        ) begin
 
                             sda_drive_low <= 1'b0;
 
-                            // First byte after address is register
-                            // address.
+                            ack_low_seen  <= 1'b0;
+                            ack_high_seen <= 1'b0;
+
+
                             if (current_reg_addr == 8'h00) begin
 
+                                // First byte = register address.
                                 current_reg_addr <= rx_shift;
 
                             end
                             else begin
 
+                                // Following bytes = register data.
                                 write_en   <= 1'b1;
                                 write_addr <= current_reg_addr;
 
@@ -371,7 +449,9 @@ module i2c_slave #(
 
                                 current_reg_addr <=
                                     current_reg_addr + 8'd1;
+
                             end
+
 
                             rx_shift  <= 8'h00;
                             bit_count <= 3'd0;
@@ -382,11 +462,12 @@ module i2c_slave #(
 
 
                     // =================================================
-                    // READ
+                    // READ DATA TRANSMIT
                     // =================================================
 
                     ST_READ: begin
 
+                        // Data is changed while SCL is LOW.
                         if (scl_fall) begin
 
                             if (tx_shift[7])
@@ -394,10 +475,12 @@ module i2c_slave #(
                             else
                                 sda_drive_low <= 1'b1;
 
+
                             tx_shift <= {
                                 tx_shift[6:0],
                                 1'b0
                             };
+
 
                             if (bit_count == 3'd7) begin
 
@@ -408,13 +491,14 @@ module i2c_slave #(
                             else begin
 
                                 bit_count <= bit_count + 3'd1;
+
                             end
                         end
                     end
 
 
                     // =================================================
-                    // MASTER ACK/NACK AFTER READ
+                    // MASTER ACK/NACK AFTER READ BYTE
                     // =================================================
 
                     ST_READ_ACK: begin
@@ -425,6 +509,7 @@ module i2c_slave #(
 
                             if (!sda_sync) begin
 
+                                // Master ACK -> next byte.
                                 current_reg_addr <=
                                     current_reg_addr + 8'd1;
 
@@ -436,35 +521,42 @@ module i2c_slave #(
                                 tx_shift <= read_data;
 
                                 state <= ST_READ;
+
                             end
                             else begin
 
+                                // Master NACK -> terminate.
                                 state <= ST_IDLE;
+
                             end
 
                             bit_count <= 3'd0;
+
                         end
                     end
 
 
                     // =================================================
-                    // SAFETY DEFAULT
+                    // SAFETY
                     // =================================================
 
                     default: begin
 
                         state         <= ST_IDLE;
 
-                        bit_count     <= 3'd0;
                         rx_shift      <= 8'h00;
                         tx_shift      <= 8'h00;
+
+                        bit_count     <= 3'd0;
 
                         address_match <= 1'b0;
                         rw_bit        <= 1'b0;
 
-                        ack_phase     <= 1'b0;
+                        ack_low_seen  <= 1'b0;
+                        ack_high_seen <= 1'b0;
 
                         sda_drive_low <= 1'b0;
+
                     end
 
                 endcase
