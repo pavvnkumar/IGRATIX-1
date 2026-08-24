@@ -80,6 +80,7 @@ module i2c_slave_tb;
 
     task automatic i2c_start;
         begin
+
             sda_master = 1'b1;
             scl        = 1'b1;
 
@@ -92,6 +93,7 @@ module i2c_slave_tb;
             scl = 1'b0;
 
             wait_clk();
+
         end
     endtask
 
@@ -102,6 +104,7 @@ module i2c_slave_tb;
 
     task automatic i2c_stop;
         begin
+
             sda_master = 1'b0;
             scl        = 1'b0;
 
@@ -114,6 +117,7 @@ module i2c_slave_tb;
             sda_master = 1'b1;
 
             wait_clk();
+
         end
     endtask
 
@@ -176,8 +180,6 @@ module i2c_slave_tb;
 
     // ============================================================
     // Address ACK/NACK check
-    //
-    // For address ACK, no transaction event is expected here.
     // ============================================================
 
     task automatic i2c_check_address_ack(
@@ -241,10 +243,6 @@ module i2c_slave_tb;
 
     // ============================================================
     // Write-byte ACK + write-event check
-    //
-    // The write_en event is generated on the final falling edge
-    // of the ACK cycle. Therefore we monitor it immediately around
-    // that edge.
     // ============================================================
 
     task automatic i2c_check_write_ack(
@@ -270,7 +268,6 @@ module i2c_slave_tb;
             repeat (3) @(posedge clk);
 
 
-            // ACK must be visible while SCL is high.
             if (sda !== 1'b0) begin
 
                 $display(
@@ -289,7 +286,7 @@ module i2c_slave_tb;
             scl = 1'b0;
 
 
-            // Watch the next several clocks for the write event.
+            // Monitor write event.
             for (cycles = 0; cycles < 6; cycles = cycles + 1) begin
 
                 @(posedge clk);
@@ -354,10 +351,6 @@ module i2c_slave_tb;
 
     // ============================================================
     // Read address ACK + read request check
-    //
-    // read_req is generated when the address ACK completes.
-    // Therefore it must be observed around the ACK completion,
-    // not after a long wait.
     // ============================================================
 
     task automatic i2c_check_read_address;
@@ -395,11 +388,11 @@ module i2c_slave_tb;
             end
 
 
-            // ACK completes on SCL falling edge.
+            // ACK completes on falling edge.
             scl = 1'b0;
 
 
-            // Monitor read_req event.
+            // Monitor read request event.
             for (cycles = 0; cycles < 6; cycles = cycles + 1) begin
 
                 @(posedge clk);
@@ -448,10 +441,104 @@ module i2c_slave_tb;
 
 
     // ============================================================
+    // Read one byte from slave.
+    //
+    // Master releases SDA.
+    // Slave drives each bit while SCL is LOW.
+    // Master samples each bit while SCL is HIGH.
+    // ============================================================
+
+    task automatic i2c_read_byte(
+        output logic [7:0] value
+    );
+
+        integer b;
+
+        begin
+
+            value = 8'h00;
+
+            // Master must release SDA for slave transmission.
+            sda_master = 1'b1;
+
+
+            for (b = 7; b >= 0; b = b - 1) begin
+
+                // Start each data bit with SCL LOW.
+                scl = 1'b0;
+
+                wait_clk();
+
+
+                // Raise SCL and sample the slave bit.
+                scl = 1'b1;
+
+                repeat (3) @(posedge clk);
+
+                value[b] = sda;
+
+
+                // Return SCL LOW.
+                scl = 1'b0;
+
+                wait_clk();
+
+            end
+
+        end
+    endtask
+
+
+    // ============================================================
+    // Master NACK after read byte.
+    //
+    // NACK = SDA released HIGH while SCL HIGH.
+    // ============================================================
+
+    task automatic i2c_master_nack;
+        begin
+
+            sda_master = 1'b1;
+
+            scl = 1'b0;
+
+            wait_clk();
+
+            scl = 1'b1;
+
+            repeat (3) @(posedge clk);
+
+
+            if (sda !== 1'b1) begin
+
+                $display(
+                    "FAIL: expected NACK after read, SDA=%b slave_drive=%b state=%0d",
+                    sda,
+                    sda_slave_low,
+                    dut.state
+                );
+
+                $fatal(1);
+
+            end
+
+
+            scl = 1'b0;
+
+            wait_clk();
+
+        end
+    endtask
+
+
+    // ============================================================
     // Main test
     // ============================================================
 
     initial begin
+
+        logic [7:0] received_data;
+
 
         rst_n      = 1'b0;
 
@@ -475,8 +562,6 @@ module i2c_slave_tb;
         // ========================================================
         // TEST 1
         // Valid address + WRITE
-        //
-        // 0x40 << 1 = 0x80
         // ========================================================
 
         $display("TEST 1: valid address ACK");
@@ -497,8 +582,6 @@ module i2c_slave_tb;
 
         i2c_write_byte(8'h10);
 
-        // This ACK is followed by no write event because
-        // 0x10 is interpreted as register address.
         i2c_check_address_ack(1'b1);
 
 
@@ -523,8 +606,6 @@ module i2c_slave_tb;
         // ========================================================
         // TEST 4
         // Invalid address must NACK
-        //
-        // 0x41 << 1 = 0x82
         // ========================================================
 
         $display("TEST 4: invalid address NACK");
@@ -541,8 +622,6 @@ module i2c_slave_tb;
         // ========================================================
         // TEST 5
         // Valid address + READ
-        //
-        // 0x40 << 1 | 1 = 0x81
         // ========================================================
 
         $display("TEST 5: valid read address ACK");
@@ -554,9 +633,43 @@ module i2c_slave_tb;
         i2c_check_read_address();
 
 
+        // ========================================================
+        // TEST 6
+        // Read actual data byte.
+        //
+        // read_data = A5 = 1010_0101
+        // ========================================================
+
+        $display("TEST 6: read data transmission");
+
+        i2c_read_byte(received_data);
+
+
+        $display(
+            "READ DATA: received=%02h expected=%02h",
+            received_data,
+            read_data
+        );
+
+
+        if (received_data !== read_data) begin
+
+            $display(
+                "FAIL: read data mismatch received=%02h expected=%02h",
+                received_data,
+                read_data
+            );
+
+            $fatal(1);
+
+        end
+
+
         // --------------------------------------------------------
-        // End read transaction.
+        // Master terminates the read with NACK.
         // --------------------------------------------------------
+
+        i2c_master_nack();
 
         i2c_stop();
 
@@ -567,7 +680,7 @@ module i2c_slave_tb;
 
         $display("");
         $display("==============================================");
-        $display("PASS: i2c_slave address/register/read request");
+        $display("PASS: i2c_slave address/register/read data");
         $display("==============================================");
 
         $finish;

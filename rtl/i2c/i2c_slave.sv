@@ -147,8 +147,7 @@ module i2c_slave #(
         else begin
 
             // ----------------------------------------------------
-            // Default transaction outputs.
-            // Both are one clk-wide event pulses.
+            // One-clock event pulses.
             // ----------------------------------------------------
 
             write_en <= 1'b0;
@@ -186,20 +185,20 @@ module i2c_slave #(
 
             else if (stop_detect) begin
 
-                state            <= ST_IDLE;
+                state         <= ST_IDLE;
 
-                rx_shift         <= 8'h00;
-                tx_shift         <= 8'h00;
+                rx_shift      <= 8'h00;
+                tx_shift      <= 8'h00;
 
-                bit_count        <= 3'd0;
+                bit_count     <= 3'd0;
 
-                address_match    <= 1'b0;
-                rw_bit           <= 1'b0;
+                address_match <= 1'b0;
+                rw_bit        <= 1'b0;
 
-                ack_low_seen     <= 1'b0;
-                ack_high_seen    <= 1'b0;
+                ack_low_seen  <= 1'b0;
+                ack_high_seen <= 1'b0;
 
-                sda_drive_low    <= 1'b0;
+                sda_drive_low <= 1'b0;
             end
 
 
@@ -221,11 +220,6 @@ module i2c_slave #(
 
                     // =================================================
                     // ADDRESS RECEIVE
-                    //
-                    // Byte:
-                    //
-                    // [7:1] = slave address
-                    // [0]   = R/W
                     // =================================================
 
                     ST_ADDRESS: begin
@@ -247,6 +241,7 @@ module i2c_slave #(
                                 ) begin
 
                                     address_match <= 1'b1;
+
                                     rw_bit <=
                                         {rx_shift[6:0], sda_sync}[0];
 
@@ -254,7 +249,7 @@ module i2c_slave #(
                                 else begin
 
                                     address_match <= 1'b0;
-                                    rw_bit <= 1'b0;
+                                    rw_bit        <= 1'b0;
 
                                 end
 
@@ -281,7 +276,6 @@ module i2c_slave #(
                     ST_ADDRESS_ACK: begin
 
                         // Valid address -> ACK.
-                        // Invalid address -> NACK.
                         if (address_match)
                             sda_drive_low <= 1'b1;
                         else
@@ -297,7 +291,7 @@ module i2c_slave #(
                         end
 
 
-                        // SCL rising edge is the ACK sampling point.
+                        // ACK sampled while SCL is HIGH.
                         if (scl_rise && ack_low_seen) begin
 
                             ack_high_seen <= 1'b1;
@@ -312,8 +306,6 @@ module i2c_slave #(
                             ack_high_seen
                         ) begin
 
-                            sda_drive_low <= 1'b0;
-
                             ack_low_seen  <= 1'b0;
                             ack_high_seen <= 1'b0;
 
@@ -325,16 +317,31 @@ module i2c_slave #(
 
                                 if (rw_bit) begin
 
-                                    // -----------------------------
+                                    // --------------------------------
                                     // Valid READ address.
-                                    // Generate read request exactly
-                                    // when address ACK completes.
-                                    // -----------------------------
+                                    //
+                                    // Generate read request and load
+                                    // transmit shift register.
+                                    //
+                                    // IMPORTANT:
+                                    // The first data bit is driven NOW,
+                                    // during the low phase immediately
+                                    // following the address ACK.
+                                    // --------------------------------
 
                                     read_addr <= current_reg_addr;
                                     read_req  <= 1'b1;
 
-                                    tx_shift <= read_data;
+                                    tx_shift <= {
+                                        read_data[6:0],
+                                        1'b0
+                                    };
+
+                                    // First transmitted bit is bit 7.
+                                    if (read_data[7])
+                                        sda_drive_low <= 1'b0;
+                                    else
+                                        sda_drive_low <= 1'b1;
 
                                     state <= ST_READ;
 
@@ -342,12 +349,16 @@ module i2c_slave #(
                                 else begin
 
                                     // Valid WRITE address.
+                                    sda_drive_low <= 1'b0;
+
                                     state <= ST_WRITE;
 
                                 end
 
                             end
                             else begin
+
+                                sda_drive_low <= 1'b0;
 
                                 state <= ST_IDLE;
 
@@ -457,25 +468,35 @@ module i2c_slave #(
                             bit_count <= 3'd0;
 
                             state <= ST_WRITE;
+
                         end
                     end
 
 
                     // =================================================
                     // READ DATA TRANSMIT
+                    //
+                    // SDA is changed only while SCL is LOW.
+                    //
+                    // At entry from ADDRESS_ACK, bit 7 has already
+                    // been placed on SDA.
+                    //
+                    // Each subsequent SCL falling edge advances to
+                    // the next data bit.
                     // =================================================
 
                     ST_READ: begin
 
-                        // Data is changed while SCL is LOW.
                         if (scl_fall) begin
 
+                            // Drive current MSB.
                             if (tx_shift[7])
                                 sda_drive_low <= 1'b0;
                             else
                                 sda_drive_low <= 1'b1;
 
 
+                            // Advance to next bit.
                             tx_shift <= {
                                 tx_shift[6:0],
                                 1'b0
@@ -485,6 +506,9 @@ module i2c_slave #(
                             if (bit_count == 3'd7) begin
 
                                 bit_count <= 3'd0;
+
+                                // After the eighth data bit,
+                                // release SDA for master ACK/NACK.
                                 state <= ST_READ_ACK;
 
                             end
@@ -503,13 +527,14 @@ module i2c_slave #(
 
                     ST_READ_ACK: begin
 
+                        // Slave releases SDA so master can ACK/NACK.
                         sda_drive_low <= 1'b0;
 
                         if (scl_rise) begin
 
                             if (!sda_sync) begin
 
-                                // Master ACK -> next byte.
+                                // Master ACK -> request next byte.
                                 current_reg_addr <=
                                     current_reg_addr + 8'd1;
 
@@ -518,15 +543,27 @@ module i2c_slave #(
 
                                 read_req <= 1'b1;
 
-                                tx_shift <= read_data;
+                                tx_shift <= {
+                                    read_data[6:0],
+                                    1'b0
+                                };
+
+                                // Prepare first bit of next byte
+                                // immediately after ACK.
+                                if (read_data[7])
+                                    sda_drive_low <= 1'b0;
+                                else
+                                    sda_drive_low <= 1'b1;
 
                                 state <= ST_READ;
 
                             end
                             else begin
 
-                                // Master NACK -> terminate.
+                                // Master NACK -> terminate read.
                                 state <= ST_IDLE;
+
+                                sda_drive_low <= 1'b0;
 
                             end
 
