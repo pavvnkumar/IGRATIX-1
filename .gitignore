@@ -1,0 +1,18 @@
+# Generated/build output
+build/
+reports/
+sim/
+
+# Tool-generated files
+*.vcd
+*.fst
+*.log
+*.jou
+*.rpt
+*.tmp
+
+# Editor
+.vscode/
+
+# OS
+.DS_Store
