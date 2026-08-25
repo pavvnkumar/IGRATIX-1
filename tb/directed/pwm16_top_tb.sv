@@ -16,6 +16,9 @@ module pwm16_top_tb;
     integer high_count;
     integer low_count;
 
+    wire VPWR = 1'b1;
+    wire VGND = 1'b0;
+
 
     // ------------------------------------------------------------
     // Open drain I2C bus

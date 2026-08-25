@@ -6,7 +6,7 @@ module pwm_controller (
 
     input  logic [15:0]  pwm_div,
 
-    input logic [15:0][11:0] active_duty,
+    input logic [191:0] active_duty,
 
     input  logic         output_enable,
 
@@ -32,7 +32,7 @@ module pwm_controller (
             pwm_channel u_pwm_channel (
                 .clk           (clk),
                 .rst_n         (rst_n),
-                .duty_active   (active_duty[ch]),
+                .duty_active   (active_duty[ch*12 +: 12]),
                 .pwm_count     (pwm_count),
                 .output_enable (output_enable),
                 .pwm_out       (pwm_out[ch])

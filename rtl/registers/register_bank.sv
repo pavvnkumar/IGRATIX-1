@@ -16,7 +16,7 @@ module register_bank (
 
     // PWM configuration
     output logic [15:0] pwm_div,
-    output logic [15:0][11:0] duty_shadow,
+    output logic [191:0] duty_shadow,
 
     // Control
     output logic        output_enable,
@@ -116,53 +116,53 @@ module register_bank (
             // Bits [11:0] contain duty.
             // Upper nibble is reserved and reads as zero.
             // ----------------------------------------------------
-            8'h10: read_data = duty_shadow[0][7:0];
-            8'h11: read_data = {4'h0, duty_shadow[0][11:8]};
+            8'h10: read_data = duty_shadow[0*12 +: 8];
+            8'h11: read_data = {4'h0, duty_shadow[0*12+8 +: 4]};
 
-            8'h12: read_data = duty_shadow[1][7:0];
-            8'h13: read_data = {4'h0, duty_shadow[1][11:8]};
+            8'h12: read_data = duty_shadow[1*12 +: 8];
+            8'h13: read_data = {4'h0, duty_shadow[1*12+8 +: 4]};
 
-            8'h14: read_data = duty_shadow[2][7:0];
-            8'h15: read_data = {4'h0, duty_shadow[2][11:8]};
+            8'h14: read_data = duty_shadow[2*12 +: 8];
+            8'h15: read_data = {4'h0, duty_shadow[2*12+8 +: 4]};
 
-            8'h16: read_data = duty_shadow[3][7:0];
-            8'h17: read_data = {4'h0, duty_shadow[3][11:8]};
+            8'h16: read_data = duty_shadow[3*12 +: 8];
+            8'h17: read_data = {4'h0, duty_shadow[3*12+8 +: 4]};
 
-            8'h18: read_data = duty_shadow[4][7:0];
-            8'h19: read_data = {4'h0, duty_shadow[4][11:8]};
+            8'h18: read_data = duty_shadow[4*12 +: 8];
+            8'h19: read_data = {4'h0, duty_shadow[4*12+8 +: 4]};
 
-            8'h1A: read_data = duty_shadow[5][7:0];
-            8'h1B: read_data = {4'h0, duty_shadow[5][11:8]};
+            8'h1A: read_data = duty_shadow[5*12 +: 8];
+            8'h1B: read_data = {4'h0, duty_shadow[5*12+8 +: 4]};
 
-            8'h1C: read_data = duty_shadow[6][7:0];
-            8'h1D: read_data = {4'h0, duty_shadow[6][11:8]};
+            8'h1C: read_data = duty_shadow[6*12 +: 8];
+            8'h1D: read_data = {4'h0, duty_shadow[6*12+8 +: 4]};
 
-            8'h1E: read_data = duty_shadow[7][7:0];
-            8'h1F: read_data = {4'h0, duty_shadow[7][11:8]};
+            8'h1E: read_data = duty_shadow[7*12 +: 8];
+            8'h1F: read_data = {4'h0, duty_shadow[7*12+8 +: 4]};
 
-            8'h20: read_data = duty_shadow[8][7:0];
-            8'h21: read_data = {4'h0, duty_shadow[8][11:8]};
+            8'h20: read_data = duty_shadow[8*12 +: 8];
+            8'h21: read_data = {4'h0, duty_shadow[8*12+8 +: 4]};
 
-            8'h22: read_data = duty_shadow[9][7:0];
-            8'h23: read_data = {4'h0, duty_shadow[9][11:8]};
+            8'h22: read_data = duty_shadow[9*12 +: 8];
+            8'h23: read_data = {4'h0, duty_shadow[9*12+8 +: 4]};
 
-            8'h24: read_data = duty_shadow[10][7:0];
-            8'h25: read_data = {4'h0, duty_shadow[10][11:8]};
+            8'h24: read_data = duty_shadow[10*12 +: 8];
+            8'h25: read_data = {4'h0, duty_shadow[10*12+8 +: 4]};
 
-            8'h26: read_data = duty_shadow[11][7:0];
-            8'h27: read_data = {4'h0, duty_shadow[11][11:8]};
+            8'h26: read_data = duty_shadow[11*12 +: 8];
+            8'h27: read_data = {4'h0, duty_shadow[11*12+8 +: 4]};
 
-            8'h28: read_data = duty_shadow[12][7:0];
-            8'h29: read_data = {4'h0, duty_shadow[12][11:8]};
+            8'h28: read_data = duty_shadow[12*12 +: 8];
+            8'h29: read_data = {4'h0, duty_shadow[12*12+8 +: 4]};
 
-            8'h2A: read_data = duty_shadow[13][7:0];
-            8'h2B: read_data = {4'h0, duty_shadow[13][11:8]};
+            8'h2A: read_data = duty_shadow[13*12 +: 8];
+            8'h2B: read_data = {4'h0, duty_shadow[13*12+8 +: 4]};
 
-            8'h2C: read_data = duty_shadow[14][7:0];
-            8'h2D: read_data = {4'h0, duty_shadow[14][11:8]};
+            8'h2C: read_data = duty_shadow[14*12 +: 8];
+            8'h2D: read_data = {4'h0, duty_shadow[14*12+8 +: 4]};
 
-            8'h2E: read_data = duty_shadow[15][7:0];
-            8'h2F: read_data = {4'h0, duty_shadow[15][11:8]};
+            8'h2E: read_data = duty_shadow[15*12 +: 8];
+            8'h2F: read_data = {4'h0, duty_shadow[15*12+8 +: 4]};
 
             default: begin
                 read_data = 8'h00;
@@ -189,7 +189,7 @@ module register_bank (
             software_reset_pulse <= 1'b0;
 
             for (i = 0; i < 16; i = i + 1)
-                duty_shadow[i] <= 12'h000;
+                duty_shadow[i*12 +: 12] <= 12'h000;
 
         end
 
@@ -311,53 +311,53 @@ module register_bank (
                     //   bits [7:4] = reserved
                     // =================================================
 
-                    8'h10: duty_shadow[0][7:0]   <= write_data[7:0];
-                    8'h11: duty_shadow[0][11:8]  <= write_data[3:0];
+                    8'h10: duty_shadow[0*12 +: 8]   <= write_data[7:0];
+                    8'h11: duty_shadow[0*12+8 +: 4]  <= write_data[3:0];
 
-                    8'h12: duty_shadow[1][7:0]   <= write_data[7:0];
-                    8'h13: duty_shadow[1][11:8]  <= write_data[3:0];
+                    8'h12: duty_shadow[1*12 +: 8]   <= write_data[7:0];
+                    8'h13: duty_shadow[1*12+8 +: 4]  <= write_data[3:0];
 
-                    8'h14: duty_shadow[2][7:0]   <= write_data[7:0];
-                    8'h15: duty_shadow[2][11:8]  <= write_data[3:0];
+                    8'h14: duty_shadow[2*12 +: 8]   <= write_data[7:0];
+                    8'h15: duty_shadow[2*12+8 +: 4]  <= write_data[3:0];
 
-                    8'h16: duty_shadow[3][7:0]   <= write_data[7:0];
-                    8'h17: duty_shadow[3][11:8]  <= write_data[3:0];
+                    8'h16: duty_shadow[3*12 +: 8]   <= write_data[7:0];
+                    8'h17: duty_shadow[3*12+8 +: 4]  <= write_data[3:0];
 
-                    8'h18: duty_shadow[4][7:0]   <= write_data[7:0];
-                    8'h19: duty_shadow[4][11:8]  <= write_data[3:0];
+                    8'h18: duty_shadow[4*12 +: 8]   <= write_data[7:0];
+                    8'h19: duty_shadow[4*12+8 +: 4]  <= write_data[3:0];
 
-                    8'h1A: duty_shadow[5][7:0]   <= write_data[7:0];
-                    8'h1B: duty_shadow[5][11:8]  <= write_data[3:0];
+                    8'h1A: duty_shadow[5*12 +: 8]   <= write_data[7:0];
+                    8'h1B: duty_shadow[5*12+8 +: 4]  <= write_data[3:0];
 
-                    8'h1C: duty_shadow[6][7:0]   <= write_data[7:0];
-                    8'h1D: duty_shadow[6][11:8]  <= write_data[3:0];
+                    8'h1C: duty_shadow[6*12 +: 8]   <= write_data[7:0];
+                    8'h1D: duty_shadow[6*12+8 +: 4]  <= write_data[3:0];
 
-                    8'h1E: duty_shadow[7][7:0]   <= write_data[7:0];
-                    8'h1F: duty_shadow[7][11:8]  <= write_data[3:0];
+                    8'h1E: duty_shadow[7*12 +: 8]   <= write_data[7:0];
+                    8'h1F: duty_shadow[7*12+8 +: 4]  <= write_data[3:0];
 
-                    8'h20: duty_shadow[8][7:0]   <= write_data[7:0];
-                    8'h21: duty_shadow[8][11:8]  <= write_data[3:0];
+                    8'h20: duty_shadow[8*12 +: 8]   <= write_data[7:0];
+                    8'h21: duty_shadow[8*12+8 +: 4]  <= write_data[3:0];
 
-                    8'h22: duty_shadow[9][7:0]   <= write_data[7:0];
-                    8'h23: duty_shadow[9][11:8]  <= write_data[3:0];
+                    8'h22: duty_shadow[9*12 +: 8]   <= write_data[7:0];
+                    8'h23: duty_shadow[9*12+8 +: 4]  <= write_data[3:0];
 
-                    8'h24: duty_shadow[10][7:0]  <= write_data[7:0];
-                    8'h25: duty_shadow[10][11:8] <= write_data[3:0];
+                    8'h24: duty_shadow[10*12 +: 8]  <= write_data[7:0];
+                    8'h25: duty_shadow[10*12+8 +: 4] <= write_data[3:0];
 
-                    8'h26: duty_shadow[11][7:0]  <= write_data[7:0];
-                    8'h27: duty_shadow[11][11:8] <= write_data[3:0];
+                    8'h26: duty_shadow[11*12 +: 8]  <= write_data[7:0];
+                    8'h27: duty_shadow[11*12+8 +: 4] <= write_data[3:0];
 
-                    8'h28: duty_shadow[12][7:0]  <= write_data[7:0];
-                    8'h29: duty_shadow[12][11:8] <= write_data[3:0];
+                    8'h28: duty_shadow[12*12 +: 8]  <= write_data[7:0];
+                    8'h29: duty_shadow[12*12+8 +: 4] <= write_data[3:0];
 
-                    8'h2A: duty_shadow[13][7:0]  <= write_data[7:0];
-                    8'h2B: duty_shadow[13][11:8] <= write_data[3:0];
+                    8'h2A: duty_shadow[13*12 +: 8]  <= write_data[7:0];
+                    8'h2B: duty_shadow[13*12+8 +: 4] <= write_data[3:0];
 
-                    8'h2C: duty_shadow[14][7:0]  <= write_data[7:0];
-                    8'h2D: duty_shadow[14][11:8] <= write_data[3:0];
+                    8'h2C: duty_shadow[14*12 +: 8]  <= write_data[7:0];
+                    8'h2D: duty_shadow[14*12+8 +: 4] <= write_data[3:0];
 
-                    8'h2E: duty_shadow[15][7:0]  <= write_data[7:0];
-                    8'h2F: duty_shadow[15][11:8] <= write_data[3:0];
+                    8'h2E: duty_shadow[15*12 +: 8]  <= write_data[7:0];
+                    8'h2F: duty_shadow[15*12+8 +: 4] <= write_data[3:0];
 
 
                     // =================================================

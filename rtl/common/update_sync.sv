@@ -6,12 +6,12 @@ module update_sync (
 
     input  logic        pwm_boundary,
 
-    input logic [15:0][11:0] shadow_duty,
+    input logic [191:0] shadow_duty,
 
     input logic        global_update,
     input logic [3:0]  group_update,
 
-    output logic [15:0][11:0] active_duty,
+    output logic [191:0] active_duty,
 
     output logic update_done
 );
@@ -40,7 +40,7 @@ module update_sync (
             update_done <= 1'b0;
 
             for(i=0;i<16;i=i+1)
-                active_duty[i] <= 12'h000;
+                active_duty[i*12 +: 12] <= 12'h000;
 
         end
 
@@ -68,7 +68,7 @@ module update_sync (
                 if(current_global) begin
 
                     for(i=0;i<16;i=i+1)
-                        active_duty[i] <= shadow_duty[i];
+                        active_duty[i*12 +: 12] <= shadow_duty[i*12 +: 12];
 
                 end
 
@@ -78,22 +78,22 @@ module update_sync (
 
                     if(current_group[0])
                         for(i=0;i<4;i=i+1)
-                            active_duty[i] <= shadow_duty[i];
+                            active_duty[i*12 +: 12] <= shadow_duty[i*12 +: 12];
 
 
                     if(current_group[1])
                         for(i=4;i<8;i=i+1)
-                            active_duty[i] <= shadow_duty[i];
+                            active_duty[i*12 +: 12] <= shadow_duty[i*12 +: 12];
 
 
                     if(current_group[2])
                         for(i=8;i<12;i=i+1)
-                            active_duty[i] <= shadow_duty[i];
+                            active_duty[i*12 +: 12] <= shadow_duty[i*12 +: 12];
 
 
                     if(current_group[3])
                         for(i=12;i<16;i=i+1)
-                            active_duty[i] <= shadow_duty[i];
+                            active_duty[i*12 +: 12] <= shadow_duty[i*12 +: 12];
 
                 end
 
