@@ -94,6 +94,9 @@ module i2c_slave #(
     logic       rw_bit;
 
     logic [7:0] current_reg_addr;
+    logic [7:0] rx_byte;
+
+    assign rx_byte = {rx_shift[6:0], sda_sync};
 
 
     // ============================================================
@@ -236,14 +239,14 @@ module i2c_slave #(
                             if (bit_count == 3'd7) begin
 
                                 if (
-                                    {rx_shift[6:0], sda_sync}[7:1]
+                                    rx_byte[7:1]
                                     == DEVICE_ADDR
                                 ) begin
 
                                     address_match <= 1'b1;
 
                                     rw_bit <=
-                                        {rx_shift[6:0], sda_sync}[0];
+                                        rx_byte[0];
 
                                 end
                                 else begin

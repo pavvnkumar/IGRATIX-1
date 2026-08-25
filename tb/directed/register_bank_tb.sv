@@ -14,7 +14,7 @@ module register_bank_tb;
     logic [7:0]  read_data;
 
     logic [15:0] pwm_div;
-    logic [11:0] duty_shadow [0:15];
+    logic [15:0][11:0] duty_shadow;
     logic        output_enable;
 
     logic        global_update;

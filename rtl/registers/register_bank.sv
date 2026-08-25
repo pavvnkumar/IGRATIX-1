@@ -16,7 +16,7 @@ module register_bank (
 
     // PWM configuration
     output logic [15:0] pwm_div,
-    output logic [11:0] duty_shadow [0:15],
+    output logic [15:0][11:0] duty_shadow,
 
     // Control
     output logic        output_enable,

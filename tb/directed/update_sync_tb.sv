@@ -7,8 +7,8 @@ module update_sync_tb;
 
     logic pwm_boundary;
 
-    logic [11:0] shadow_duty [0:15];
-    logic [11:0] active_duty [0:15];
+    logic [15:0][11:0] shadow_duty;
+    logic [15:0][11:0] active_duty;
     logic update_done;
 
     logic        global_update;

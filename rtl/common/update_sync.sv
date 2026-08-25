@@ -6,12 +6,12 @@ module update_sync (
 
     input  logic        pwm_boundary,
 
-    input  logic [11:0] shadow_duty [0:15],
+    input logic [15:0][11:0] shadow_duty,
 
-    input  logic        global_update,
-    input  logic [3:0]  group_update,
+    input logic        global_update,
+    input logic [3:0]  group_update,
 
-    output logic [11:0] active_duty [0:15],
+    output logic [15:0][11:0] active_duty,
 
     output logic update_done
 );

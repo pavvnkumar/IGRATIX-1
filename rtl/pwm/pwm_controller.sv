@@ -6,7 +6,7 @@ module pwm_controller (
 
     input  logic [15:0]  pwm_div,
 
-    input  logic [11:0]  active_duty [0:15],
+    input logic [15:0][11:0] active_duty,
 
     input  logic         output_enable,
 

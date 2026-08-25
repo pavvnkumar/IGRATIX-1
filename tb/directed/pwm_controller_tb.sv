@@ -7,7 +7,7 @@ module pwm_controller_tb;
 
     logic [15:0] pwm_div;
 
-    logic [11:0] active_duty [0:15];
+    logic [15:0][11:0] active_duty;
 
     logic output_enable;
 

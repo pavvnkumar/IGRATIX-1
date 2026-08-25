@@ -37,7 +37,7 @@ module pwm16_top (
 
     logic [15:0] pwm_div;
 
-    logic [11:0] duty_shadow [0:15];
+    logic [15:0][11:0] duty_shadow;
 
     logic        output_enable;
 
@@ -52,7 +52,7 @@ module pwm16_top (
     // UPDATE SYNC
     // ============================================================
 
-    logic [11:0] active_duty [0:15];
+    logic [15:0][11:0] active_duty;
 
     logic        pwm_boundary;
     logic update_done;
